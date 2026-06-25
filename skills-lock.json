@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ponytail": {
+      "source": "dietrichgebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "ceef852b0aa6ba5fe1db2b5976c2383a7998dba562f62fed0142193a894ece53"
+    }
+  }
+}
