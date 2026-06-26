@@ -9,6 +9,8 @@ services:
     image: fastapi-sandbox
     ports:
       - "8000:8000" # Maps container port 8000 to localhost
+    volumes:
+      - ../manifests:/usr/src/manifests
     deploy:
       resources:
         limits:

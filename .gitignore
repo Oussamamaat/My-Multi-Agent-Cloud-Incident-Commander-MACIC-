@@ -3,3 +3,5 @@ __pycache__/
 .agents/
 .env
 MACIC_PRD.md
+*.md
+opencode.json
