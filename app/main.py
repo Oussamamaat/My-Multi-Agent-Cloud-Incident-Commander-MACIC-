@@ -1,41 +1,48 @@
 from fastapi import FastAPI, Response
+from fastapi.responses import PlainTextResponse
 import logging
 import os
+from prometheus_client import generate_latest, Counter
 
-# Set up FastAPI app
 app = FastAPI()
 
-# Set up structured logging in JSON format
 logging.basicConfig(level=logging.INFO, format='{"level": "%(levelname)s", "message": "%(message)s"}')
 logger = logging.getLogger(__name__)
 
-# Health check endpoint
+REQUEST_COUNT = Counter("request_count", "Total request count")
+
+@app.middleware("http")
+async def count_requests(request, call_next):
+    response = await call_next(request)
+    REQUEST_COUNT.inc()
+    return response
+
 @app.get("/health")
 def read_health():
     logger.info("Health check endpoint hit.")
     return {"status": "ok"}
 
-# Endpoint to simulate OOM (Out-Of-Memory) error
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics():
+    return PlainTextResponse(generate_latest(), media_type="text/plain")
+
 @app.get("/simulate-oom")
 def simulate_oom():
     logger.info("Simulating OOM crash...")
     try:
-        # Allocate memory in a non-terminating loop to mimic OOM crash
         data = []
         while True:
-            data.append(os.urandom(1024 * 1024))  # allocate ~1MiB continuously
+            data.append(os.urandom(1024 * 1024))
     except MemoryError as e:
         logger.error(f"Container crashed due to OOM: {str(e)}")
         return Response(content="Simulated Out-Of-Memory crash", status_code=500)
 
-# Endpoint to simulate environment variable corruption
 @app.get("/corrupt-env")
 def corrupt_env():
     logger.info("Simulating critical environment variable corruption...")
     try:
-        # Simulate loss of a critical environment variable
-        os.environ.pop("DATABASE_URL", None)  # Remove DATABASE_URL if exists
-        value = os.environ["DATABASE_URL"]  # Trigger KeyError
+        os.environ.pop("DATABASE_URL", None)
+        value = os.environ["DATABASE_URL"]
     except KeyError as e:
         logger.error(f"Critical environment variable is missing: {str(e)}")
         return Response(content="Simulated environment variable corruption", status_code=500)

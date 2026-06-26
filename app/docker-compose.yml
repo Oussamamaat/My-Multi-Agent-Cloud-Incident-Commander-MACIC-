@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  web-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: web-app
+    image: fastapi-sandbox
+    ports:
+      - "8000:8000" # Maps container port 8000 to localhost
+    deploy:
+      resources:
+        limits:
+          memory: 128m # Limit memory to 128 MiB
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090" # Prometheus UI available at localhost:9090
