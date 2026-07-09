@@ -28,12 +28,18 @@ def get_container_logs(service_name: str, tail_lines: int = 100) -> str:
     if not pods.items:
         return f"Error: No pods found for service {service_name} in {MACIC_NAMESPACE}"
     pod_name = pods.items[0].metadata.name
-    logs = v1.read_namespaced_pod_log(
-        name=pod_name,
-        namespace=MACIC_NAMESPACE,
-        tail_lines=tail_lines
-    )
-    return logs
+    logs = ""
+    for prev in [True, False]:
+        try:
+            logs += v1.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=MACIC_NAMESPACE,
+                tail_lines=tail_lines,
+                previous=prev
+            ) + "\n"
+        except Exception:
+            pass
+    return logs.strip()
 
 def get_prometheus_metrics(query: str, endpoint: str = "http://localhost:9090") -> str:
     url = f"{endpoint}/api/v1/query?query={urllib.parse.quote(query)}"

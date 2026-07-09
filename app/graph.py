@@ -92,6 +92,30 @@ def _parse_devops_response(text: str, manifest: str) -> dict:
             parts["risk"] = after_reason.split("---RISK---", 1)[1].strip().split("\n")[0].strip()
             if parts["risk"] not in ("LOW", "MEDIUM", "HIGH"):
                 parts["risk"] = "LOW"
+        else:
+            import re
+            yaml_blocks = re.findall(r"```(?:yaml)?\s*([\s\S]*?)```", text)
+            if not yaml_blocks:
+                yaml_blocks = re.findall(r"^---\s*\n([\s\S]*?)\n---", text, re.MULTILINE)
+            if yaml_blocks:
+                parts["yaml"] = yaml_blocks[0].strip()
+            for label in ["REASONING", "---REASONING---"]:
+                if label in text:
+                    after = text.split(label, 1)[1]
+                    for rlabel in ["RISK", "---RISK---"]:
+                        if rlabel in after:
+                            parts["reasoning"] = after.split(rlabel, 1)[0].strip()
+                            break
+                    else:
+                        parts["reasoning"] = after.strip()
+                    break
+            for label in ["RISK", "---RISK---"]:
+                if label in text:
+                    after = text.split(label, 1)[1]
+                    candidate = after.strip().split("\n")[0].strip().rstrip(":")
+                    if candidate in ("LOW", "MEDIUM", "HIGH"):
+                        parts["risk"] = candidate
+                    break
     except Exception:
         parts["reasoning"] = "Parse error extracting LLM response sections."
     return parts
