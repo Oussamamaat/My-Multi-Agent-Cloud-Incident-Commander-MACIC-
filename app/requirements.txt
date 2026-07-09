@@ -1,3 +1,5 @@
 fastapi
 uvicorn
 prometheus-client
+langchain
+langchain-ollama

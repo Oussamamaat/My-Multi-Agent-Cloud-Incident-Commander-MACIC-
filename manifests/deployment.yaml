@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: macic-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: web-app
+          image: fastapi-sandbox:latest
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: web-app-config
+          resources:
+            limits:
+              memory: "128Mi"

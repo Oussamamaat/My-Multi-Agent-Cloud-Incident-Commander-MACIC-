@@ -26,6 +26,7 @@ def trigger_incident():
 
     print("\nAlert Payload:")
     print(json.dumps(alert, indent=2))
+    return alert
 
 if __name__ == "__main__":
     trigger_incident()
