@@ -8,14 +8,18 @@ import subprocess
 
 
 def main():
-    process = subprocess.Popen(
-        ["kubectl", "port-forward", "deployment/web-app", "-n", "macic-sandbox", "8000:8000"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
-    )
-    time.sleep(3)
+    scenario = sys.argv[1] if len(sys.argv) > 1 else "oom"
+    processes = []
     try:
-        alert = trigger_incident()
+        for resource, port in [("deployment/web-app", "8000:8000"), ("deployment/prometheus", "9090:9090")]:
+            p = subprocess.Popen(
+                ["kubectl", "port-forward", resource, "-n", "macic-sandbox", port],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            processes.append(p)
+        time.sleep(3)
+        alert = trigger_incident(scenario)
         if not alert:
             print("No alert generated. Exiting.")
             sys.exit(1)
@@ -30,8 +34,9 @@ def main():
         print(f"Reconciled: {final_state.get('reconciliation_success', 'N/A (aborted)')}")
         print(f"\nPost-mortem:\n{final_state.get('post_mortem_report', 'N/A (no report)')}")
     finally:
-        process.terminate() 
-        process.wait()
+        for p in processes:
+            p.terminate()
+            p.wait(timeout=5)
 if __name__ == "__main__":
     main()
 

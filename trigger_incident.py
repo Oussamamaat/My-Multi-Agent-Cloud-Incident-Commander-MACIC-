@@ -4,11 +4,25 @@ from datetime import datetime, timezone
 
 BASE_URL = "http://localhost:8000"
 
-def trigger_incident():
+def trigger_incident(scenario="oom"):
     print("Triggering incident...")
-
+    if scenario == "oom":
+        url = "/simulate-oom"
+        alert_name = "OOMKilled"
+    elif scenario == "corrupt-env":
+        url = "/corrupt-env"
+        alert_name = "EnvVarMissing"
+    elif scenario == "cpu-spike":
+        url = "/cpu-spike"
+        alert_name = "CPUThrottling"
+    elif scenario == "crash-loop":
+        url = "/crash-loop"
+        alert_name = "CrashLoopBackOff"
+    else:
+        print(f"Unknown scenario: {scenario}")
+        return
     try:
-        req = urllib.request.Request(f"{BASE_URL}/simulate-oom")
+        req = urllib.request.Request(f"{BASE_URL}{url}")
         urllib.request.urlopen(req, timeout=30)
     except Exception as e:
         print(f"App crashed as expected: {type(e).__name__}")
@@ -17,7 +31,7 @@ def trigger_incident():
         return
 
     alert = {
-        "alert_name": "OOMKilled",
+        "alert_name": alert_name,
         "target_service": "web-app",
         "namespace": "default",
         "timestamp": datetime.now(timezone.utc).isoformat(),

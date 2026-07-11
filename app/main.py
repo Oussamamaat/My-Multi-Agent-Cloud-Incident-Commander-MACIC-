@@ -48,3 +48,21 @@ def corrupt_env():
         return Response(content="Simulated environment variable corruption", status_code=500)
 
     return {"message": "Unexpected behavior"}
+
+@app.get("/cpu-spike")
+def cpu_spike():
+    logger.info("Simulating CPU spike...")
+    x = 0
+    for i in range(10_000_000):
+        x += i * i
+    logger.error(f"Excessive CPU usage detected, result={x}")
+    return Response(content="Simulated CPU throttling event", status_code=500)
+
+@app.get("/crash-loop")
+def crash_loop():
+    logger.info("Simulating crash loop...")
+    try:
+        raise RuntimeError("Application crashed on startup: missing dependency")
+    except RuntimeError as e:
+        logger.error(f"Crash loop detected: {str(e)}")
+        return Response(content="Simulated crash loop", status_code=500)
