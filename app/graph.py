@@ -10,6 +10,9 @@ from langgraph.graph import StateGraph, START, END
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from app.state import IncidentState
+
+def _log(msg: str) -> str:
+    return f"{datetime.utcnow().isoformat()}Z {msg}"
 from app.tools import (
     get_container_logs,
     get_prometheus_metrics,
@@ -23,8 +26,8 @@ llm = ChatOllama(model="llama3.1:latest", temperature=0)
 llm2 = ChatOllama(model="qwen2.5-coder:latest", temperature=0)
 
 investigate_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a senior SRE investigating a service incident. Analyze the logs and metrics to determine the root cause."),
-    ("human", "Service: {service}\nLogs:\n{logs}\nMetrics:\n{metrics}\nWhat is the root cause?"),
+    ("system", "You are a read-only infrastructure forensic analyst. You have access to container logs and Prometheus metrics. Your job is to identify the precise technical root cause of an incident. You look for exit codes, OOM events, connection timeouts, and configuration errors. You output a structured root cause analysis with evidence."),
+    ("human", "Service: {service}\nLogs:\n{logs}\nMetrics:\n{metrics}\n\nDiagnosis:\nEvidence:\nExit Code:\nConfidence Level:"),
 ])
 
 devops_prompt = ChatPromptTemplate.from_messages([
@@ -59,7 +62,7 @@ def triage_node(state: IncidentState) -> Dict[str, Any]:
     except Exception as e:
         assessment = f"(fallback) Alert received: {state.alert_payload.get('alert_name')}"
     print(assessment)
-    msg = f"[Triage] {assessment}"
+    msg = _log(f"[Triage] {assessment}")
     return {"execution_log": state.execution_log + [msg]}
 
 def investigate_node(state: IncidentState) -> Dict[str, Any]:
@@ -73,7 +76,7 @@ def investigate_node(state: IncidentState) -> Dict[str, Any]:
         root_cause = response.content
     except Exception as e:
         root_cause = f"(fallback) OOM suspected for {service_name}. LLM unavailable: {e}"
-    msg = f"[Investigate] Fetched logs and metrics for {service_name}."
+    msg = _log(f"[Investigate] Fetched logs and metrics for {service_name}.")
     return {
         "raw_logs": logs,
         "metrics_snapshot": metrics,
@@ -135,7 +138,7 @@ def devops_node(state: IncidentState) -> Dict[str, Any]:
         print(f"[DevOps] LLM failed: {e}. Using fallback.")
         parsed = {"yaml": manifest, "reasoning": f"LLM call failed: {e}", "risk": "LOW"}
     diff = write_proposed_manifest("deployment.yaml", parsed["yaml"])
-    msg = f"[DevOps] Generated proposed manifest diff for {service_name}."
+    msg = _log(f"[DevOps] Generated proposed manifest diff for {service_name}.")
     return {
         "current_manifest": manifest,
         "proposed_diff": diff,
@@ -150,6 +153,7 @@ def hitl_gate_node(state: IncidentState) -> Dict[str, Any]:
     table.add_column("Label", style="bold")
     table.add_column("Value")
     table.add_row("Incident", f"{state.alert_payload.get('alert_name')} — {state.alert_payload.get('target_service')}")
+    table.add_row("Timestamp", state.alert_payload.get("timestamp", "unknown"))
     table.add_row("Root Cause", state.root_cause_analysis or "(pending)")
     table.add_row("Proposed Change", state.proposed_diff or "(no diff)")
     table.add_row("Risk Score", state.risk_score or "UNKNOWN")
@@ -158,7 +162,7 @@ def hitl_gate_node(state: IncidentState) -> Dict[str, Any]:
     console.print(panel)
     choice = Prompt.ask("Approve execution?", choices=["y", "n"], default="n")
     approved = choice == "y"
-    msg = f"[HITL] {'Approved' if approved else 'Rejected'} by human."
+    msg = _log(f"[HITL] {'Approved' if approved else 'Rejected'} by human.")
     console.print(f"\nDecision: {'APPROVED' if approved else 'REJECTED'}", style="green" if approved else "red")
     return {
         "approval_status": approved,
@@ -170,9 +174,9 @@ def reconcile_node(state: IncidentState) -> Dict[str, Any]:
     print("---[Reconcile Node]---")
     apply_output = apply_manifest("manifests/deployment.yaml")
     ok, ms = check_service_health("http://localhost:8000/health")
-    logs = [f"[Reconcile] Manifest applied. Output: {apply_output.strip()}"]
-    logs.append(f"[Reconcile] Health check {'passed' if ok else 'failed'} ({ms:.0f}ms).")
-    msg = f"[Reconcile] Health check {'passed' if ok else 'failed'} ({ms:.0f}ms)."
+    logs = [_log(f"[Reconcile] Manifest applied. Output: {apply_output.strip()}")]
+    logs.append(_log(f"[Reconcile] Health check {'passed' if ok else 'failed'} ({ms:.0f}ms)."))
+    msg = _log(f"[Reconcile] Health check {'passed' if ok else 'failed'} ({ms:.0f}ms).")
     return {
         "reconciliation_success": ok,
         "health_check_result": f"{'OK' if ok else 'FAIL'} — {ms:.0f}ms",
@@ -194,7 +198,7 @@ def report_node(state: IncidentState) -> Dict[str, Any]:
     with open(filepath, "w") as f:
         f.write(report)
     print(f"\n[Report] Saved to {filepath}")
-    msg = f"[Report] Post-mortem generated and saved to {filepath}."
+    msg = _log(f"[Report] Post-mortem generated and saved to {filepath}.")
     return {
         "post_mortem_report": report,
         "execution_log": state.execution_log + [msg],
@@ -215,7 +219,7 @@ def abort_node(state: IncidentState) -> Dict[str, Any]:
     filepath = f"reports/escalated_{timestamp}.json"
     with open(filepath, "w") as f:
         json.dump(partial, f, indent=2)
-    msg = f"[Abort] Incident escalated to on-call engineer. Partial state saved to {filepath}."
+    msg = _log(f"[Abort] Incident escalated to on-call engineer. Partial state saved to {filepath}.")
     print(msg)
     return {"execution_log": state.execution_log + [msg]}
 
